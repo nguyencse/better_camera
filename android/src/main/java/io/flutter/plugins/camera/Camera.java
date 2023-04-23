@@ -196,6 +196,7 @@ public class Camera {
       int biggestDifference = 0;
 
       for (int i = 0; i < fpsRanges.length; i++) {
+        Log.e("nguyencse", "fps range: " + fpsRanges[i].getLower() + " - " + fpsRanges[i].getUpper());
         int currentDifference = fpsRanges[i].getUpper() - fpsRanges[i].getLower();
 
         if (currentDifference > biggestDifference) {
