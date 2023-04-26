@@ -204,9 +204,11 @@ public class Camera {
           biggestDifference = currentDifference;
         }
       }
-
-      // aeFPSRange = fpsRanges[idx];
-      aeFPSRange = new Range<>(60, 60);
+      if (isFrontFacing){
+        aeFPSRange = fpsRanges[idx];
+      } else {
+        aeFPSRange = new Range<>(60, 60);
+      }
     }
   }
 
