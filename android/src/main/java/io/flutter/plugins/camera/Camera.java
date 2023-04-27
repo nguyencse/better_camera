@@ -161,8 +161,6 @@ public class Camera {
 
     mCameraCharacteristics = cameraManager.getCameraCharacteristics(cameraName);
 
-    setBestAERange(mCameraCharacteristics);
-
     StreamConfigurationMap streamConfigurationMap =
             mCameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 
@@ -176,6 +174,7 @@ public class Camera {
             mCameraCharacteristics.get(CameraCharacteristics.LENS_FACING) == CameraMetadata.LENS_FACING_FRONT;
     ResolutionPreset preset = ResolutionPreset.valueOf(resolutionPreset);
 
+    setBestAERange(mCameraCharacteristics);
 
     recordingProfile =
         CameraUtils.getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset);
@@ -188,26 +187,38 @@ public class Camera {
             characteristics.get(CameraCharacteristics.CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES);
 
     if (fpsRanges != null) {
-      if (fpsRanges.length <= 0) {
+      if (fpsRanges.length == 0) {
         return;
       }
 
-      int idx = 0;
-      int biggestDifference = 0;
+//      int idx = 0;
+//      int biggestDifference = 0;
+//
+//      for (int i = 0; i < fpsRanges.length; i++) {
+//        Log.e("nguyencse", "fps range: " + fpsRanges[i].getLower() + " - " + fpsRanges[i].getUpper());
+//        int currentDifference = fpsRanges[i].getUpper() - fpsRanges[i].getLower();
+//
+//        if (currentDifference > biggestDifference) {
+//          idx = i;
+//          biggestDifference = currentDifference;
+//        }
+//      }
 
+      int idx = 0;
       for (int i = 0; i < fpsRanges.length; i++) {
         Log.e("nguyencse", "fps range: " + fpsRanges[i].getLower() + " - " + fpsRanges[i].getUpper());
         int currentDifference = fpsRanges[i].getUpper() - fpsRanges[i].getLower();
-
-        if (currentDifference > biggestDifference) {
+        if (currentDifference <= (fpsRanges[idx].getUpper() - fpsRanges[idx].getLower()) && fpsRanges[i].getUpper() >= fpsRanges[idx].getUpper()) {
           idx = i;
-          biggestDifference = currentDifference;
         }
       }
+
       if (isFrontFacing){
         aeFPSRange = fpsRanges[idx];
       } else {
-        aeFPSRange = new Range<>(60, 60);
+        int upper = Math.max(fpsRanges[idx].getUpper(), 60);
+        int lower = Math.max(fpsRanges[idx].getLower(), 60);
+        aeFPSRange = new Range<>(lower, upper);
       }
     }
   }
