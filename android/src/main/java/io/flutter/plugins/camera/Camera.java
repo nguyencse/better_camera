@@ -208,7 +208,8 @@ public class Camera {
       for (int i = 0; i < fpsRanges.length; i++) {
         Log.e("nguyencse", "fps range: " + fpsRanges[i].getLower() + " - " + fpsRanges[i].getUpper());
         int currentDifference = fpsRanges[i].getUpper() - fpsRanges[i].getLower();
-        if (currentDifference <= (fpsRanges[idx].getUpper() - fpsRanges[idx].getLower()) && fpsRanges[i].getUpper() >= fpsRanges[idx].getUpper()) {
+        int currentMaxDifference = fpsRanges[idx].getUpper() - fpsRanges[idx].getLower();
+        if ((fpsRanges[i].getUpper().intValue() == fpsRanges[idx].getUpper().intValue() && currentDifference <= currentMaxDifference) || (fpsRanges[i].getUpper() > fpsRanges[idx].getUpper())) {
           idx = i;
         }
       }
