@@ -193,6 +193,7 @@ static ResolutionPreset getResolutionPresetForString(NSString *preset) {
 @property(assign, nonatomic) CMTime lastAudioSampleTime;
 @property(assign, nonatomic) CMTime videoTimeOffset;
 @property(assign, nonatomic) CMTime audioTimeOffset;
+@property(assign, nonatomic) BOOL isVideoFrameAvailable;
 @property(nonatomic) CMMotionManager *motionManager;
 @property AVAssetWriterInputPixelBufferAdaptor *videoAdaptor;
 - (instancetype)initWithCameraName:(NSString *)cameraName
@@ -378,7 +379,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
 - (void)captureOutput:(AVCaptureOutput *)output
     didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
            fromConnection:(AVCaptureConnection *)connection {
-  if (output == _captureVideoOutput) {
+  if (output == _captureVideoOutput && connection.isVideoOrientationSupported) { //specifying condition for video sample
     CVPixelBufferRef newBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
     CFRetain(newBuffer);
     CVPixelBufferRef old = _latestPixelBuffer;
@@ -470,12 +471,13 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
     CFRetain(sampleBuffer);
     CMTime currentSampleTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
 
-    if (_videoWriter.status != AVAssetWriterStatusWriting) {
+    if (_videoWriter.status != AVAssetWriterStatusWriting && connection.isVideoOrientationSupported) { //specifying condition for video sample
       [_videoWriter startWriting];
       [_videoWriter startSessionAtSourceTime:currentSampleTime];
     }
 
     if (output == _captureVideoOutput) {
+        _isVideoFrameAvailable=true; //making it true
       if (_videoIsDisconnected) {
         _videoIsDisconnected = NO;
 
@@ -495,33 +497,35 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
       CMTime nextSampleTime = CMTimeSubtract(_lastVideoSampleTime, _videoTimeOffset);
       [_videoAdaptor appendPixelBuffer:nextBuffer withPresentationTime:nextSampleTime];
     } else {
-      CMTime dur = CMSampleBufferGetDuration(sampleBuffer);
+        if(_isVideoFrameAvailable){
+            CMTime dur = CMSampleBufferGetDuration(sampleBuffer);
 
-      if (dur.value > 0) {
-        currentSampleTime = CMTimeAdd(currentSampleTime, dur);
-      }
+            if (dur.value > 0) {
+              currentSampleTime = CMTimeAdd(currentSampleTime, dur);
+            }
 
-      if (_audioIsDisconnected) {
-        _audioIsDisconnected = NO;
+            if (_audioIsDisconnected) {
+              _audioIsDisconnected = NO;
 
-        if (_audioTimeOffset.value == 0) {
-          _audioTimeOffset = CMTimeSubtract(currentSampleTime, _lastAudioSampleTime);
-        } else {
-          CMTime offset = CMTimeSubtract(currentSampleTime, _lastAudioSampleTime);
-          _audioTimeOffset = CMTimeAdd(_audioTimeOffset, offset);
+              if (_audioTimeOffset.value == 0) {
+                _audioTimeOffset = CMTimeSubtract(currentSampleTime, _lastAudioSampleTime);
+              } else {
+                CMTime offset = CMTimeSubtract(currentSampleTime, _lastAudioSampleTime);
+                _audioTimeOffset = CMTimeAdd(_audioTimeOffset, offset);
+              }
+
+              return;
+            }
+
+            _lastAudioSampleTime = currentSampleTime;
+
+            if (_audioTimeOffset.value != 0) {
+              CFRelease(sampleBuffer);
+              sampleBuffer = [self adjustTime:sampleBuffer by:_audioTimeOffset];
+            }
+
+            [self newAudioSample:sampleBuffer];
         }
-
-        return;
-      }
-
-      _lastAudioSampleTime = currentSampleTime;
-
-      if (_audioTimeOffset.value != 0) {
-        CFRelease(sampleBuffer);
-        sampleBuffer = [self adjustTime:sampleBuffer by:_audioTimeOffset];
-      }
-
-      [self newAudioSample:sampleBuffer];
     }
 
     CFRelease(sampleBuffer);
@@ -631,9 +635,13 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
       return;
     }
     _isRecording = YES;
+    _isVideoFrameAvailable = false;
     _isRecordingPaused = NO;
     _videoTimeOffset = CMTimeMake(0, 1);
     _audioTimeOffset = CMTimeMake(0, 1);
+    // https://github.com/flutter/flutter/issues/57831#issuecomment-1086597283
+    // _videoTimeOffset = CMTimeMakeWithSeconds(1, 10);
+    // _audioTimeOffset = CMTimeMakeWithSeconds(1, 10);
     _videoIsDisconnected = NO;
     _audioIsDisconnected = NO;
     result(nil);
@@ -645,6 +653,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
 - (void)stopVideoRecordingWithResult:(FlutterResult)result {
   if (_isRecording) {
     _isRecording = NO;
+    _isVideoFrameAvailable = false;
     if (_videoWriter.status != AVAssetWriterStatusUnknown) {
       [_videoWriter finishWritingWithCompletionHandler:^{
         if (self->_videoWriter.status == AVAssetWriterStatusCompleted) {
