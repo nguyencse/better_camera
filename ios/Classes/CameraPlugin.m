@@ -163,6 +163,7 @@ static ResolutionPreset getResolutionPresetForString(NSString *preset) {
 @property(nonatomic, copy) void (^onFrameAvailable)();
 @property BOOL enableAudio;
 @property int flashMode;
+@property int fps;
 @property BOOL enableAutoExposure;
 @property BOOL autoFocusEnabled;
 @property(nonatomic) FlutterEventChannel *eventChannel;
@@ -199,7 +200,8 @@ static ResolutionPreset getResolutionPresetForString(NSString *preset) {
 - (instancetype)initWithCameraName:(NSString *)cameraName
                   resolutionPreset:(NSString *)resolutionPreset
                        enableAudio:(BOOL)enableAudio
-                        flashMode:(int)flashMode
+                         flashMode:(int)flashMode
+                               fps:(int)fps
                   autoFocusEnabled:(int)autoFocusEnabled
                         enableAutoExposure:(BOOL)enableAutoExposure
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
@@ -213,6 +215,7 @@ static ResolutionPreset getResolutionPresetForString(NSString *preset) {
 - (void)stopImageStream;
 - (void)captureToFile:(NSString *)filename result:(FlutterResult)result;
 - (void)setFlashMode:(int)flashMode;
+- (void)configFPS:(NSNumber *)frameRate;
 @end
 
 @implementation FLTCam {
@@ -224,8 +227,9 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
 - (instancetype)initWithCameraName:(NSString *)cameraName
                   resolutionPreset:(NSString *)resolutionPreset
                        enableAudio:(BOOL)enableAudio
-                       flashMode:(int)flashMode
-                    autoFocusEnabled:(int)autoFocusEnabled
+                         flashMode:(int)flashMode
+                               fps:(int)fps
+                  autoFocusEnabled:(int)autoFocusEnabled
                        enableAutoExposure:(BOOL)enableAutoExposure
                      dispatchQueue:(dispatch_queue_t)dispatchQueue
                              error:(NSError **)error {
@@ -282,6 +286,14 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
     }
 
   [self setCaptureSessionPreset:_resolutionPreset];
+
+  if (fps > 0) {
+    [self setFPS:fps];
+
+    NSNumber *nsFPS = [NSNumber numberWithInteger:fps];
+    [self configFPS:nsFPS];
+  }
+
   return self;
 }
 
@@ -477,7 +489,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
     }
 
     if (output == _captureVideoOutput) {
-        _isVideoFrameAvailable=true; //making it true
+        _isVideoFrameAvailable = true; //making it true
       if (_videoIsDisconnected) {
         _videoIsDisconnected = NO;
 
@@ -725,6 +737,10 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
     _flashMode = flashMode;
 }
 
+- (void)setFPS:(int)fps {
+    _fps = fps;
+}
+
 - (void)setAutoExposureMode:(BOOL)enable {
   [_captureDevice lockForConfiguration:nil];
   if (enable) {
@@ -877,6 +893,39 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
     }
   }
 }
+
+- (void)configFPS:(NSNumber *)frameRate {
+    int fps = [frameRate intValue];
+
+    if (fps > 0) {
+      AVCaptureDeviceFormat *bestFormat = nil;
+      AVFrameRateRange *bestFrameRateRange = nil;
+      for ( AVCaptureDeviceFormat *format in [_captureDevice formats] ) {
+          for ( AVFrameRateRange *range in format.videoSupportedFrameRateRanges ) {
+              CMVideoDimensions dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription);
+              NSInteger width = dimensions.width;
+              NSInteger height = dimensions.height;
+
+              // if (range.maxFrameRate == fps && (width * 1.0 / height) == (_previewSize.width / _previewSize.height)) {
+              if (range.maxFrameRate == fps && width == _previewSize.width && height == _previewSize.height) {
+                  bestFormat = format;
+                  bestFrameRateRange = range;
+              }
+          }
+      }
+      
+      NSLog(@"nguyenny ==> best format %@",bestFormat);
+      
+      if (bestFormat) {
+          if ( [_captureDevice lockForConfiguration:NULL] == YES ) {
+              _captureDevice.activeFormat = bestFormat;
+              _captureDevice.activeVideoMinFrameDuration = bestFrameRateRange.minFrameDuration;
+              _captureDevice.activeVideoMaxFrameDuration = bestFrameRateRange.minFrameDuration;
+              [_captureDevice unlockForConfiguration];
+          }
+      }
+    }
+}
 @end
 
 @interface CameraPlugin ()
@@ -951,6 +1000,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
     NSString *resolutionPreset = call.arguments[@"resolutionPreset"];
     NSNumber *enableAudio = call.arguments[@"enableAudio"];
     NSNumber *flashMode = call.arguments[@"flashMode"];
+    NSNumber *fps = call.arguments[@"fps"];
     NSNumber *enableAutoExposure = call.arguments[@"enableAutoExposure"];
     NSNumber *autoFocusEnabled = call.arguments[@"autoFocusEnabled"];
 
@@ -959,6 +1009,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
                                     resolutionPreset:resolutionPreset
                                          enableAudio:[enableAudio boolValue]
                                          flashMode:[flashMode intValue]
+                                         fps:[fps intValue]
                                     autoFocusEnabled:[autoFocusEnabled boolValue]
                                         enableAutoExposure:[enableAutoExposure boolValue]
                                        dispatchQueue:_dispatchQueue
@@ -1020,6 +1071,14 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
       [_camera zoom:[step doubleValue]];
       result(nil);
 
+  } else if ([@"configFPS" isEqualToString:call.method]) {
+    NSNumber *fps = call.arguments[@"fps"];
+    int fpsValue = [fps intValue];
+    if (fpsValue > 0) {
+      [_camera setFPS:fpsValue];
+      [_camera configFPS:fps];
+    }
+    result(nil);
   }
     else {
     NSDictionary *argsMap = call.arguments;

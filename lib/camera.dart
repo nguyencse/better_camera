@@ -268,6 +268,7 @@ class CameraController extends ValueNotifier<CameraValue> {
     this.autoFocusEnabled = true,
     this.flashMode = FlashMode.off,
     this.enableAutoExposure = true,
+    this.fps = -1,
   }) : super(const CameraValue.uninitialized());
 
   final CameraDescription description;
@@ -280,6 +281,7 @@ class CameraController extends ValueNotifier<CameraValue> {
   final bool autoFocusEnabled;
   final FlashMode flashMode;
   final enableAutoExposure;
+  final int fps;
 
   int? _textureId;
   bool _isDisposed = false;
@@ -305,6 +307,7 @@ class CameraController extends ValueNotifier<CameraValue> {
           'autoFocusEnabled': autoFocusEnabled,
           'enableAutoExposure': enableAutoExposure,
           'flashMode': flashMode.index,
+          'fps': fps,
         },
       )) as Map<String, dynamic>;
       _textureId = reply['textureId'];
