@@ -906,8 +906,8 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
               NSInteger width = dimensions.width;
               NSInteger height = dimensions.height;
               
-              // if (range.maxFrameRate == fps && width == _currentPreviewSize.width && height == _currentPreviewSize.height) {
-              if (range.maxFrameRate >= fps && range.minFrameRate <= fps && width == _currentPreviewSize.width && height == _currentPreviewSize.height) {
+              // if (range.maxFrameRate == fps && width == _previewSize.width && height == _previewSize.height) {
+              if (range.maxFrameRate >= fps && range.minFrameRate <= fps && width == _previewSize.width && height == _previewSize.height) {
                   bestFormat = format;
                   bestFrameRateRange = range;
               }
