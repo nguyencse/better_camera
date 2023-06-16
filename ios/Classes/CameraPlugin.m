@@ -391,7 +391,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
 - (void)captureOutput:(AVCaptureOutput *)output
     didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
            fromConnection:(AVCaptureConnection *)connection {
-  if (output == _captureVideoOutput && connection.isVideoOrientationSupported) { //specifying condition for video sample
+  if (output == _captureVideoOutput) {
     CVPixelBufferRef newBuffer = CMSampleBufferGetImageBuffer(sampleBuffer);
     CFRetain(newBuffer);
     CVPixelBufferRef old = _latestPixelBuffer;
@@ -483,7 +483,7 @@ FourCharCode const videoFormat = kCVPixelFormatType_32BGRA;
     CFRetain(sampleBuffer);
     CMTime currentSampleTime = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
 
-    if (_videoWriter.status != AVAssetWriterStatusWriting && connection.isVideoOrientationSupported) { //specifying condition for video sample
+    if (_videoWriter.status != AVAssetWriterStatusWriting) { //specifying condition for video sample
       [_videoWriter startWriting];
       [_videoWriter startSessionAtSourceTime:currentSampleTime];
     }
